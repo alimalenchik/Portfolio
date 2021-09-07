@@ -1,0 +1,285 @@
+---
+title: "Final Project: Adult Income in the U.S."
+author: "Ali Malenchik"
+date: February 23, 2020
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#load packages
+library(ggplot2)
+library(MASS)
+library(knitr)
+library(tidyverse)
+library(caret)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+library(ResourceSelection)
+```
+
+# Data Import
+
+```{r}
+#set working directory
+setwd("/Users/alimalenchik/Documents/Grad_School/DSC_520/Final_Project/Salary_Prediction")
+
+#store CSV files into data frames (remove whitespace)
+test_df <- read.csv("adult-test.csv", skip=1, header=FALSE, strip.white=TRUE)  #ignore first line having a comment in the csv
+train_df <- read.csv("adult-train.csv", header=FALSE, strip.white=TRUE)
+```
+# Data Cleansing & Standardization
+
+**Add column names to the data frames**
+
+```{r}
+#Add column names
+colnames(train_df) <- c("Age","Workclass","fnlwgt","Education","Education_number","Marital_status","Occupation","Relationship","Race","Gender","Capital_gain","Capital_loss","Hours_per_week","Native_country","Salary")
+
+colnames(test_df) <- c("Age","Workclass","fnlwgt","Education","Education_number","Marital_status","Occupation","Relationship","Race","Gender","Capital_gain","Capital_loss","Hours_per_week","Native_country","Salary")
+```
+
+**Filter out records having missing data**
+
+Since the dataset is relatively large, we will eliminate any rows containing missing values in order to reduce error in the analysis.
+
+```{r}
+#filter out any rows containing missing values ("?") and remove levels with 0 records from factor variables
+train_df.clean <- train_df %>% filter(rowSums(train_df=="?") == 0) %>% droplevels()
+test_df.clean <- test_df %>% filter(rowSums(test_df=="?") == 0) %>% droplevels()
+```
+
+`r NROW(train_df)-NROW(train_df.clean)` records have been removed from the training data set.
+
+`r NROW(test_df)-NROW(test_df.clean)` records have been removed from the test data set.
+
+**Modify Native Country Variable**
+
+I updated Native_country to a binary variable "Native_country.USA" indicating whether the person is native to the U.S. or not. I believe making this modification will allow for a more accurate model and there will be more meaningful relationships with the predictor.
+
+```{r}
+#add new variable Native_country.USA
+train_df.clean <- train_df.clean %>% mutate(Native_country.USA=as.factor(ifelse(Native_country=="United-States", "USA", "Other")))
+
+test_df.clean <- test_df.clean %>% mutate(Native_country.USA=as.factor(ifelse(Native_country=="United-States", "USA", "Other")))
+```
+
+**Fix Salary Variable**
+
+Upon summarizing the data I noticed one issue: The values for Salary bracket differ between the test and train dataset. 
+
+```{r}
+#compare Salary variables
+summary(train_df.clean$Salary)
+summary(test_df.clean$Salary)
+```
+
+In order to accurately predict the Salary bracket and enable us to compare the prediction against the test dataset, the values need to match. I will strip the "." from the Salary attribute.
+
+```{r}
+#remove "." from test_df.clean$Salary
+test_df.clean$Salary<-gsub("\\.","",test_df.clean$Salary) %>% as.factor
+
+#compare Salary variables again
+summary(train_df.clean$Salary)
+summary(test_df.clean$Salary)
+```
+
+**Remove unnecessary attributes**
+
+The following fields will be removed as they are either difficult to measure or not relevant to predicting Salary bracket: fnlwgt, Marital_status, Relationship, Capital_gain, Capital_loss, Hours_per_week. I also removed Education since we will use "Education_number" in its place, along with Native_country as we will use "Native_country.USA" instead.
+
+```{r}
+#select only relevant fields
+train_df.clean <- train_df.clean %>% select("Salary","Age","Workclass","Education_number","Occupation","Race","Gender","Native_country.USA")
+    
+test_df.clean <- test_df.clean %>% select("Salary","Age","Workclass","Education_number","Occupation","Race","Gender","Native_country.USA")
+```
+
+# Exploratory Analysis
+
+**Explore the clean training data**
+```{r}
+#view the clean structure
+str(train_df.clean)
+
+#summarize the data
+summary(train_df.clean)
+
+#view the proportions for Salary bracket
+train_df.clean$Salary %>% table %>% prop.table
+test_df.clean$Salary %>% table %>% prop.table
+
+```
+
+Based on the proportion tables we can see that approximately 75% of people in both data sets have income <=50K; the dataset is imbalanced.
+
+**Determine significance of each variable in relation to Salary**
+
+```{r warning=FALSE} 
+#Perform chi-squared test for categorical variables
+chisq.out <- train_df.clean %>% select("Workclass","Occupation","Race","Gender","Native_country.USA") %>% map(~chisq.test(.x, train_df.clean$Salary))
+
+#perform correlation test for numeric variables
+cor.test.out <- train_df.clean %>% select("Age","Education_number") %>% map(~cor.test(.x, as.numeric(train_df.clean$Salary)))
+
+#store attributes and their p-values in a data frame
+attribute_name <- c("Workclass", "Occupation", "Race", "Gender", "Native_country.USA", "Age", "Education_number")
+p_value <- c(chisq.out$Workclass$p.value, chisq.out$Occupation$p.value, chisq.out$Race$p.value, chisq.out$Gender$p.value, chisq.out$Native_country.USA$p.value, cor.test.out$Age$p.value, cor.test.out$Education_number$p.value)
+kable(data.frame(attribute_name, p_value), digits = 20, caption="P Value of Each Attribute in relation to Salary Bracket")
+```
+
+Results:
+Since all variables have a p-Value less than the significance level of 0.05, each of the variables is significantly associated with Salary bracket.
+ 
+**Visualize Variable Relationships with Salary Bracket**
+```{r}
+#common elements present in all plots
+my_theme <- list(
+    geom_bar(position="fill"), #bar plot
+    ylab("Proportion"), #add y axis label
+    scale_y_continuous(breaks = seq(0, 1, .1), limits = c(0, 1)), #update y axis tick marks
+    coord_flip(), #flip x & y axis for readability of labels
+    theme(plot.title = element_text(hjust = 0.5)) #center title
+    )
+
+ggplot(train_df.clean,aes(x=Workclass,fill=Salary)) + ggtitle("Bar Plot of Salary Bracket Grouped by Workclass") + my_theme
+
+ggplot(train_df.clean,aes(x=Occupation,fill=Salary)) + ggtitle("Bar Plot of Salary Bracket Grouped by \nOccupation") + my_theme
+
+ggplot(train_df.clean,aes(x=Race,fill=Salary)) + ggtitle("Bar Plot of Salary Bracket Grouped by Race") + my_theme
+
+ggplot(train_df.clean,aes(x=Gender,fill=Salary)) + ggtitle("Bar Plot of Salary Bracket Grouped by Gender") + my_theme
+
+ggplot(train_df.clean,aes(x=Native_country.USA,fill=Salary)) + ggtitle("Bar Plot of Salary Bracket Grouped by Native Country") + xlab("Native Country") + my_theme
+
+boxplot(Age~Salary,data=train_df.clean, horizontal=TRUE, col=c("tomato","turquoise"), main="Box Plot of Salary Bracket by Age")
+
+boxplot(Education_number~Salary,data=train_df.clean, horizontal=TRUE, col=c("tomato","turquoise"), main="Box Plot of Salary Bracket by Education Level", xlab="Education Level")
+```
+
+# Model 1: Generalized Linear Model
+
+**Step 1. Create the model**
+```{r warning=FALSE} 
+
+#>update Salary to numeric
+train_df.glm <- train_df.clean
+train_df.glm$Salary <- as.numeric(train_df.clean$Salary == ">50K") #50K will correspond to 1, <=50K will correspond to 0
+
+test_df.glm <- test_df.clean
+test_df.glm$Salary <- as.numeric(test_df.clean$Salary == ">50K") #50K will correspond to 1, <=50K will correspond to 0
+
+#create the model
+mdl.glm <- glm(Salary ~ ., family="binomial", data=train_df.glm)
+```
+
+**Step 3. Explore the model**
+
+```{r}
+#summarize model
+summary(mdl.glm)
+```
+
+Based on the results of the model, some aspects of each variable seem to be significant predictors of Salary bracket. The negative coefficients indicate that the characteristic is less likely to have a Salary greater than 50K. 
+
+The residual deviance is a significant decrease from the null deviance, meaning including the independent variables improved the model.
+
+
+**Step 4. Calculate Accuracy of the Model**
+
+```{r}
+#calculate probability for every observation
+test_df.glm$prob <- predict(mdl.glm, test_df.glm, type = "response")
+
+#transform probabilities into successes and failures (1’s and 0’s) with a threshold of .5
+test_df.glm <- test_df.glm %>% mutate(pred = 1*(prob > .5) + 0)
+
+#compare Salary vs pred
+test_df.glm <- test_df.glm %>% mutate(accurate = 1*(pred == Salary))
+
+#compute accuracy
+accuracy.glm <- round(((sum(test_df.glm$accurate)/nrow(test_df.glm))*100),2)
+```
+
+The accuracy of the generalized linear model is `r accuracy.glm`%.
+
+# Model 2: Random Forest Classifier
+
+**Step 1. Create the model**
+
+```{r}
+#set seed for reproduceability
+set.seed(51)
+
+#train the model
+(mdl.rf <- randomForest(Salary ~ ., data=train_df.clean, importance=TRUE, ntree=500))
+```
+
+**Step 2. Explore the model**
+```{r}
+#view importance of variables
+varImpPlot(mdl.rf,type=1,main="VarImpPlot of \nMean Decrease in Accuracy")
+```
+
+A high decrease in accuracy is expected for very predictive variables. We can see that removing Gender or Age from the model would result in a large decrease in accuracy, whereas removing Race or Native_country.USA would be less impactful.
+
+**Step 3. Calculate Accuracy of the Model**
+
+```{r}
+(confmat.rf <- predict(mdl.rf, test_df.clean) #make predictions
+    %>% table(test_df.clean[,1]) #create table of true values vs predictions
+    %>% confusionMatrix) #run confusion matrix
+
+#compute accuracy
+accuracy.rf <- round(((confmat.rf$overall[['Accuracy']])*100),2)
+```
+
+The accuracy of the random forest model is `r accuracy.rf`%.
+
+# Model 3: Classification Tree using RPart 
+
+**Step 1. Create the model**
+
+```{r}
+mdl.rpart <- rpart(Salary ~ ., data=train_df.clean, method = 'class', minsplit = 5, cp=-1) #cp=-1 to fully grow the tree
+
+#calculate cp of smallest tree that minimizes prediction error
+bestcp <- mdl.rpart$cptable[which.min(mdl.rpart$cptable[,"xerror"]),"CP"]
+
+#prune tree
+mdl.rpart <- prune(mdl.rpart, bestcp) 
+```
+
+**Step 2. Explore the model**
+
+```{r warning=FALSE} 
+#view cross validation results
+printcp(mdl.rpart)
+
+#view variable importance
+data.frame(importance = mdl.rpart$variable.importance) %>% kable
+
+#plot the model
+rpart.plot(mdl.rpart, main = "Salary Bracket")
+```
+
+**Step 3. Calculate Accuracy of the Model**
+
+```{r}
+(confmat.rpart <- predict(mdl.rpart, type="class",newdata=test_df.clean) #make predictions
+ %>% table(test_df.clean[,1]) #create table of true values vs predictions
+ %>% confusionMatrix) #run confusion matrix
+
+#compute accuracy
+accuracy.rpart <- round(((confmat.rpart$overall[['Accuracy']])*100),2)
+```
+
+The accuracy of the model is `r accuracy.rpart`%.
+
+# Compare Model Accuracies
+```{r}
+(data.frame("Model" = c("GLM","Random Forest","RPART"), "Accuracy" = c(accuracy.glm, accuracy.rf, accuracy.rpart)) %>% kable)
+```
