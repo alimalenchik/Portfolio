@@ -16,8 +16,8 @@ adult-test.csv - This file contains the same features as the training dataset, f
 * adult-test.csv
 * adult-train.csv
 
-## Required Changes
-* Update the working directory in the .Rmd file (setwd...)
+## Usage
+* Prior to use, update the working directory in the .Rmd file (setwd...)
 
 ## Authors
 
