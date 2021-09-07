@@ -1,4 +1,4 @@
-# Fatal Police Shootings Exploratory Data Analysis
+# Rain Prediction Model
 
 In this project, historical weather data is used to train and evaluate multiple models that predict whether or not it will rain tomorrow. Exploratory data analysis is performed along with multiple visualizations of the historical training data.
 
