@@ -3,11 +3,11 @@
 This project is an example of advanced exploratory data analysis techniques, including Probability Mass Function (PMF), Cumulative Distribution Function (CDF), hypothesis testing, and regression analysis.
 
 ## Data
-* FatalPoliceShootingsData.csv
-* MedianHouseholdIncome2015.csv
-* PercentOver25CompletedHighSchool.csv
-* PercentagePeopleBelowPovertyLevel.csv
-* ShareRaceByCity.csv
+* FatalPoliceShootingsData.csv - contains information recorded on fatal police shootings, including victim demographics, location, circumstances, etc.
+* MedianHouseholdIncome2015.csv - contains median household income statistics by city.
+* PercentOver25CompletedHighSchool.csv - contains high school graduation rate statistics by city.
+* PercentagePeopleBelowPovertyLevel.csv - contains poverty rate statistics by city.
+* ShareRaceByCity.csv - contains race demographics by city.
 
 ## Dependencies
 
