@@ -1,4 +1,4 @@
-# Caronavirus Cases Exploratory Data Analysis
+# Fatal Police Shootings Exploratory Data Analysis
 
 This project is an example of advanced exploratory data analysis techniques, including Probability Mass Function (PMF), Cumulative Distribution Function (CDF), hypothesis testing, and regression analysis.
 
