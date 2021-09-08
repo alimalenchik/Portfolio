@@ -15,6 +15,10 @@ This project is a demonstration of data mining techniques utilizing API, flat fi
 * Malenchik_Caronavirus_EDA.ipynb
 * "data" folder
 
+## Usage
+* API key must be obtained from https://www.quandl.com/data/WWDI-World-Bank-World-Development-Indicators/documentation
+* Once API key is available, replace hashes in the notebook (quandl.ApiConfig.api_key = '#########')
+
 ## Authors
 
 Ali Malenchik
