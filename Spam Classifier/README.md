@@ -17,4 +17,5 @@ SMS_data.csv - contains SMS messages and their category (ham or spam).
 ## Authors
 
 Ali Malenchik
+
 amalenc@gmail.com
