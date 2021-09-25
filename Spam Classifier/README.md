@@ -1,9 +1,9 @@
 # Spam Classification Model
 
-Placeholder
+In this project, SMS data is used to develop spam classification algorithms which predict whether a message is spam or not spam ("ham").
 
 ## Data
-Placeholder
+SMS_data.csv - contains SMS messages and their category (ham or spam).
 
 ## Dependencies
 
@@ -11,7 +11,8 @@ Placeholder
 
 ## Required Downloads
 
-* Placeholder
+SMS_data.csv
+Malenchik_SMS_Spam_Classifier.ipnyb
 
 ## Authors
 
