@@ -11,8 +11,8 @@ SMS_data.csv - contains SMS messages and their category (ham or spam).
 
 ## Required Downloads
 
-SMS_data.csv
-Malenchik_SMS_Spam_Classifier.ipnyb
+* SMS_data.csv
+* Malenchik_SMS_Spam_Classifier.ipnyb
 
 ## Authors
 
